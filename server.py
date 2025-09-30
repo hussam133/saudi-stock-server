@@ -1,93 +1,42 @@
 from flask import Flask, jsonify
-import requests
-import sqlite3
-import pandas as pd
-import datetime
 
 app = Flask(__name__)
 
-# =========================
-# إعداد قاعدة البيانات
-# =========================
-DB_FILE = "ticks.db"
-
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS ticks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol TEXT,
-            price REAL,
-            timestamp DATETIME
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# =========================
-# دالة لجلب الأسعار من TradingView (كمثال)
-# =========================
-def fetch_tick(symbol="TADAWUL:TASI"):
-    # ⚠️ هاي بس مثال باستخدام API وهمي من tradingview
-    url = f"https://api.tradingview.com/symbols/{symbol}/"
-    try:
-        # هذا مثال، لاحقاً لازم نعدل حسب الاشتراك
-        res = requests.get(url, timeout=10)
-        if res.status_code == 200:
-            data = res.json()
-            return {
-                "symbol": symbol,
-                "price": data.get("price", None),
-                "timestamp": datetime.datetime.utcnow().isoformat()
-            }
-    except Exception as e:
-        print("Error fetching tick:", e)
-    return None
-
-# =========================
-# حفظ البيانات في SQLite
-# =========================
-def save_tick(symbol, price):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("INSERT INTO ticks (symbol, price, timestamp) VALUES (?, ?, ?)",
-              (symbol, price, datetime.datetime.utcnow()))
-    conn.commit()
-    conn.close()
-
-# =========================
-# مسارات API
-# =========================
-
-@app.route("/")
+# المسار الأساسي للتأكد إن السيرفر شغال
+@app.route('/')
 def home():
     return jsonify({"message": "Saudi Stock Server is running"})
 
-@app.route("/tick/<symbol>")
-def get_tick(symbol):
-    tick = fetch_tick(symbol)
-    if tick and tick["price"] is not None:
-        save_tick(tick["symbol"], tick["price"])
-        return jsonify(tick)
-    else:
-        return jsonify({"error": "Failed to fetch tick"}), 500
+# مسار الأسعار اللحظية (تيك)
+@app.route('/tick')
+def tick():
+    # هون رح نجيب بيانات الأسعار من TradingView لاحقاً
+    data = {
+        "symbol": "TASI",
+        "price": 11000.25,
+        "time": "2025-09-30T10:30:00"
+    }
+    return jsonify(data)
 
-@app.route("/history/<symbol>")
-def get_history(symbol):
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query(
-        "SELECT * FROM ticks WHERE symbol=? ORDER BY timestamp DESC LIMIT 2000",
-        conn,
-        params=(symbol,)
-    )
-    conn.close()
-    return df.to_json(orient="records")
+# مسار المؤشرات
+@app.route('/indicators')
+def indicators():
+    indicators_data = {
+        "RSI": 55.3,
+        "MACD": {"signal": 1.2, "hist": -0.3},
+        "SMA_20": 10980.5,
+        "EMA_50": 11020.8
+    }
+    return jsonify(indicators_data)
 
-# =========================
-# تشغيل السيرفر
-# =========================
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+# مسار البيانات التاريخية (مثلاً يومين)
+@app.route('/history')
+def history():
+    history_data = [
+        {"time": "2025-09-28", "close": 10950},
+        {"time": "2025-09-29", "close": 11010}
+    ]
+    return jsonify(history_data)
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
